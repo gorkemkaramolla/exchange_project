@@ -10,31 +10,29 @@ from matplotlib.dates import DateFormatter
 class HomeScreen:
     def __init__(self, root, user, logout_callback):
         self.root = root
-        self.user = user  # Store the user information
+        self.user = user  
         self.logout_callback = logout_callback
         self.setup_ui()
+        
 
     def setup_ui(self):
         self.root.title("Ana Ekran")
         self.root.geometry("800x600")
 
-        # Top left logout button
+
         logout_button = ttk.Button(self.root, text="Çıkış Yap", command=self.logout)
         logout_button.place(anchor='nw', relx=0, rely=0)
 
-        # Right top menu with username and balance
+
         self.menu_frame = ttk.Frame(self.root)
         self.menu_frame.place(anchor='ne', relx=1, rely=0)
 
         username_label = ttk.Label(self.menu_frame, text=self.user[1], font=('Helvetica', 14, 'bold'))
         username_label.pack(anchor='ne', padx=10, pady=5)
 
-        # Container for the main elements in the center
         container = ttk.Frame(self.root, padding=20)
         container.place(anchor='center', relx=0.5, rely=0.5)
 
-
-        # Currency selection combobox
         self.currency_var = StringVar()
         currency_label = ttk.Label(container, text="Para Birimi Seçin:")
         currency_label.pack(pady=5)
@@ -42,31 +40,25 @@ class HomeScreen:
         self.currency_combobox['values'] = ('USD', 'EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'CNY', 'SEK', 'NZD', 'ALTIN(GRAM)')
         self.currency_combobox.pack(pady=5)
 
-        # Amount entry
         self.amount_var = StringVar()
         amount_label = ttk.Label(container, text="Miktarı Girin:")
         amount_label.pack(pady=5)
         self.amount_entry = ttk.Entry(container, textvariable=self.amount_var)
         self.amount_entry.pack(pady=5)
 
-        # Deposit button
         deposit_button = ttk.Button(container, text="Yatır", command=self.deposit)
         deposit_button.pack(pady=5)
 
-        # Refresh button
         refresh_button = ttk.Button(container, text="Güncelle", command=self.refresh_rates)
         refresh_button.pack(pady=5)
 
-        # Show total value graph button
         total_graph_button = ttk.Button(container, text="Toplam Grafiği Göster", command=self.show_graph)
         total_graph_button.pack(pady=5)
 
-        # Display user funds
         self.display_user_funds()
 
     def get_exchange_rate(self, base_currency='USD', target_currency='TRY', force_update=False):
         if base_currency == 'ALTIN':
-            # Fetch gold price
             db_instance.cursor.execute('SELECT rate, last_updated FROM exchange_rates WHERE base_currency = "ALTIN"')
             row = db_instance.cursor.fetchone()
             if row and not force_update:
@@ -75,7 +67,6 @@ class HomeScreen:
                 if datetime.now() - last_updated < timedelta(days=1):
                     return rate
 
-            # If not found or outdated, fetch from the API
             url = "https://api.collectapi.com/economy/goldPrice"
             headers = {
                 'content-type': "application/json",
@@ -85,8 +76,7 @@ class HomeScreen:
             if response.status_code == 200:
                 data = response.json()
                 if data['success']:
-                    rate = float(data['result'][0]['buying'])  # Assuming the first item has the required rate
-                    # Cache the new rate in the database
+                    rate = float(data['result'][0]['buying'])  
                     db_instance.cursor.execute('REPLACE INTO exchange_rates (base_currency, target_currency, rate, last_updated) VALUES (?, ?, ?, ?)',
                                                ("ALTIN", "TRY", rate, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
                     db_instance.conn.commit()
@@ -99,7 +89,6 @@ class HomeScreen:
                 return 0
 
         else:
-            # Fetch currency exchange rate
             db_instance.cursor.execute('SELECT rate, last_updated FROM exchange_rates WHERE base_currency = ? AND target_currency = ?', (base_currency, target_currency))
             row = db_instance.cursor.fetchone()
             if row and not force_update:
@@ -108,7 +97,6 @@ class HomeScreen:
                 if datetime.now() - last_updated < timedelta(days=1):
                     return rate
 
-            # If not found or outdated, fetch from the API
             url = f"https://api.collectapi.com/economy/exchange?to={target_currency}&base={base_currency}"
             headers = {
                 'content-type': "application/json",
@@ -119,7 +107,6 @@ class HomeScreen:
                 data = response.json()
                 if data['success']:
                     rate = float(data['result']['data'][0]['calculated'])
-                    # Cache the new rate in the database
                     db_instance.cursor.execute('REPLACE INTO exchange_rates (base_currency, target_currency, rate, last_updated) VALUES (?, ?, ?, ?)',
                                                (base_currency, target_currency, rate, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
                     db_instance.conn.commit()
@@ -132,19 +119,16 @@ class HomeScreen:
                 return 0
 
     def display_user_funds(self):
-        # Clear the current display
         for widget in self.menu_frame.winfo_children():
             widget.pack_forget()
 
-        # Re-add the username label
         username_label = ttk.Label(self.menu_frame, text=self.user[1], font=('Helvetica', 14, 'bold'))
         username_label.pack(anchor='ne', padx=10, pady=5)
 
-        # Fetch and display user funds
         db_instance.cursor.execute('SELECT currency_amount, currency_type FROM user_funds WHERE user_id = ?', (self.user[0],))
         user_funds = db_instance.cursor.fetchall()
 
-        self.user_funds_data = user_funds  # Store user funds data for graphing
+        self.user_funds_data = user_funds  
 
         total_try = 0
         profit_loss = self.calculate_profit_loss(user_funds)
@@ -156,14 +140,12 @@ class HomeScreen:
             profit = profit_loss.get(currency_type, 0)
             balance_label = ttk.Label(self.menu_frame, text=f"{currency_type} = {amount} (≈ {amount_in_try:.2f} TRY, Kar/Zarar: {profit:.2f} TRY)", font=('Helvetica', 12))
             balance_label.pack(anchor='ne', padx=10, pady=5)
-            # Add a button to show graph for each currency
             currency_graph_button = ttk.Button(self.menu_frame, text=f"{currency_type} Grafiği Göster", command=lambda c=currency_type: self.show_currency_graph(c))
             currency_graph_button.pack(anchor='ne', padx=10, pady=5)
 
         total_label = ttk.Label(self.menu_frame, text=f"Toplam TRY: {total_try:.2f}", font=('Helvetica', 14, 'bold'))
         total_label.pack(anchor='ne', padx=10, pady=10)
 
-        # Show the last updated time for exchange rates
         db_instance.cursor.execute('SELECT MAX(last_updated) FROM exchange_rates')
         last_updated = db_instance.cursor.fetchone()[0]
         if last_updated:
@@ -178,17 +160,14 @@ class HomeScreen:
         self.display_user_funds()
 
     def fetch_data_for_graph(self):
-        # Fetch transaction data for the user
         db_instance.cursor.execute('SELECT transaction_date, currency_amount, currency_type FROM transactions WHERE user_id = ?', (self.user[0],))
         transactions = db_instance.cursor.fetchall()
 
-        # Fetch historical exchange rates
         db_instance.cursor.execute('SELECT rate, last_updated FROM exchange_rates WHERE target_currency = "TRY"')
         exchange_rates = db_instance.cursor.fetchall()
         return transactions, exchange_rates
 
     def match_rate(self, transaction_date, currency_type, exchange_rates):
-        # Find the closest rate for the given transaction date and currency type
         closest_rate = None
         min_time_diff = timedelta.max
         transaction_datetime = datetime.strptime(transaction_date, '%Y-%m-%d %H:%M:%S')
@@ -212,16 +191,13 @@ class HomeScreen:
             rate_at_transaction = self.match_rate(transaction_date, currency_type, exchange_rates)
             if rate_at_transaction:
                 initial_value_in_try = amount * rate_at_transaction
-                # Calculate current value
                 current_rate = self.get_exchange_rate(currency_type, 'TRY')
                 current_value_in_try = amount * current_rate
-                # Calculate profit/loss
                 profit_loss[currency_type] = profit_loss.get(currency_type, 0) + (current_value_in_try - initial_value_in_try)
 
         return profit_loss
 
     def refresh_rates(self):
-        # Fetch and update the latest exchange rates
         db_instance.cursor.execute('SELECT DISTINCT currency_type FROM user_funds WHERE user_id = ?', (self.user[0],))
         currencies = db_instance.cursor.fetchall()
 
@@ -237,7 +213,6 @@ class HomeScreen:
             print("Hiç işlem bulunamadı.")
             return
 
-        # Prepare data for plotting
         date_to_total_try = {}
 
         for transaction_date, amount, currency_type in transactions:
@@ -264,8 +239,8 @@ class HomeScreen:
             plt.ylabel('TRY Değeri')
             plt.grid(True)
             plt.gca().xaxis.set_major_formatter(DateFormatter('%Y-%m-%d'))
-            plt.gca().set_xlim([sorted_dates[0], sorted_dates[-1]])  # Limit x-axis to the available date range
-            plt.gcf().autofmt_xdate()  # Rotate date labels for better readability
+            plt.gca().set_xlim([sorted_dates[0], sorted_dates[-1]])  
+            plt.gcf().autofmt_xdate()  
             plt.show()
         else:
             print("Hata: Tarih ve değer listelerinde uyumsuzluk veya kullanılabilir değer yok.")
@@ -277,7 +252,6 @@ class HomeScreen:
             print("Hiç işlem bulunamadı.")
             return
 
-        # Prepare data for plotting specific currency
         date_to_currency_try = {}
 
         for transaction_date, amount, trans_currency_type in transactions:
@@ -305,8 +279,8 @@ class HomeScreen:
             plt.ylabel('TRY Değeri')
             plt.grid(True)
             plt.gca().xaxis.set_major_formatter(DateFormatter('%Y-%m-%d'))
-            plt.gca().set_xlim([sorted_dates[0], sorted_dates[-1]])  # Limit x-axis to the available date range
-            plt.gcf().autofmt_xdate()  # Rotate date labels for better readability
+            plt.gca().set_xlim([sorted_dates[0], sorted_dates[-1]])  
+            plt.gcf().autofmt_xdate()  
             plt.show()
         else:
             print(f"Hata: {currency_type} için tarih ve değer listelerinde uyumsuzluk veya kullanılabilir değer yok.")
